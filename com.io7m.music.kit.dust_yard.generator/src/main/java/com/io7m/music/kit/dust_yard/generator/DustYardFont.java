@@ -353,7 +353,7 @@ public final class DustYardFont
         .setProduct(NTShortString.of("com.io7m.music.kit.dust_yard"))
         .setEngineers(NTShortString.of("Mark Raynsford <audio@io7m.com>"))
         .setCopyright(NTShortString.of("(c) 2021 Mark Raynsford <audio@io7m.com>"))
-        .setCreationDate(NTShortString.of(OffsetDateTime.now().toString()))
+        .setCreationDate(NTShortString.of("2021-04-06"))
         .setComment(NTLongString.of(textResource("comment.txt")))
         .build()
     );
