@@ -27,12 +27,15 @@ import com.io7m.jnoisetype.api.NTTransforms;
 import com.io7m.jnoisetype.api.NTVersion;
 import com.io7m.jnoisetype.writer.api.NTBuilderProviderType;
 import com.io7m.jnoisetype.writer.api.NTBuilderType;
+import com.io7m.jnoisetype.writer.api.NTInstrumentBuilderType;
 import com.io7m.jnoisetype.writer.api.NTSampleBuilderType;
 import com.io7m.jnoisetype.writer.api.NTWriteException;
 import com.io7m.jnoisetype.writer.api.NTWriterProviderType;
 import com.io7m.jsamplebuffer.api.SampleBufferType;
 import com.io7m.jsamplebuffer.vanilla.SampleBufferDouble;
 import com.io7m.jsamplebuffer.xmedia.SampleBufferXMedia;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.UnsupportedAudioFileException;
@@ -45,6 +48,7 @@ import java.nio.file.Path;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.SortedMap;
 import java.util.TreeMap;
@@ -58,14 +62,26 @@ import static java.nio.file.StandardOpenOption.WRITE;
 
 public final class DustYardFont
 {
+  private static final Logger LOG =
+    LoggerFactory.getLogger(DustYardFont.class);
+
+  private static final int CYMBAL_ROOT = 60;
+  private static final int SPLASH_ROOT = 84;
+
   private final NTBuilderProviderType builders;
   private final NTWriterProviderType writers;
   private final DustYardSnare snare;
+  private final DustYardBassDrum bassDrum;
+  private final DustYardChinaHiHat cym;
+  private final DustYardSplash splashConverted;
 
   public DustYardFont(
     final NTBuilderProviderType inBuilders,
     final NTWriterProviderType inWriters,
-    final DustYardSnare inSnare)
+    final DustYardSnare inSnare,
+    final DustYardBassDrum inBassDrum,
+    final DustYardChinaHiHat inCym,
+    final DustYardSplash inSplashConverted)
   {
     this.builders =
       Objects.requireNonNull(inBuilders, "builders");
@@ -73,14 +89,256 @@ public final class DustYardFont
       Objects.requireNonNull(inWriters, "writers");
     this.snare =
       Objects.requireNonNull(inSnare, "snare");
+    this.bassDrum =
+      Objects.requireNonNull(inBassDrum, "bd");
+    this.cym =
+      Objects.requireNonNull(inCym, "cym");
+    this.splashConverted =
+      Objects.requireNonNull(inSplashConverted, "splashConverted");
   }
 
   public static DustYardFont of(
     final NTBuilderProviderType builders,
     final NTWriterProviderType writers,
-    final DustYardSnare snare)
+    final DustYardSnare snare,
+    final DustYardBassDrum bd,
+    final DustYardChinaHiHat cym,
+    final DustYardSplash splashConverted)
   {
-    return new DustYardFont(builders, writers, snare);
+    return new DustYardFont(
+      builders,
+      writers,
+      snare,
+      bd,
+      cym,
+      splashConverted
+    );
+  }
+
+  /**
+   * Add all of the bass drum samples.
+   */
+
+  private static void addBassDrumSampleDefinitions(
+    final List<NTSampleBuilderType> bdSamples,
+    final NTInstrumentBuilderType sfInstrument)
+  {
+    final var velocityRegionSize = 128 / bdSamples.size();
+
+    var velocityLow = 0;
+    var velocityHigh = velocityLow + velocityRegionSize;
+
+    for (final var bdSample : bdSamples) {
+      final var zone = sfInstrument.addZone();
+      zone.addKeyRangeGenerator(24, 24);
+      zone.addGenerator(
+        NTGenerators.findForName("sampleModes").orElseThrow(),
+        NTGenericAmount.of(0));
+      zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
+      zone.addSampleGenerator(bdSample);
+      zone.addGenerator(
+        NTGenerators.findForName("decayVolEnv").orElseThrow(),
+        NTGenericAmount.of(702)
+      );
+      zone.addGenerator(
+        NTGenerators.findForName("sustainVolEnv").orElseThrow(),
+        NTGenericAmount.of(1440)
+      );
+
+      velocityLow = velocityHigh + 1;
+      velocityHigh = Math.min(127, velocityHigh + velocityRegionSize);
+    }
+  }
+
+  /**
+   * Add all of the china hihat samples.
+   */
+
+  private static void addChinaHiHatSampleDefinitions(
+    final List<NTSampleBuilderType> cymSamples,
+    final NTInstrumentBuilderType sfInstrument)
+  {
+    var index = 0;
+    for (final var cymSample : cymSamples) {
+      final var zone = sfInstrument.addZone();
+      zone.addKeyRangeGenerator(CYMBAL_ROOT + index, CYMBAL_ROOT + index);
+      zone.addGenerator(
+        NTGenerators.findForName("sampleModes").orElseThrow(),
+        NTGenericAmount.of(0));
+      zone.addSampleGenerator(cymSample);
+      ++index;
+    }
+  }
+
+  /**
+   * Add all of the snare samples.
+   */
+
+  private static void addSnareSampleDefinitions(
+    final SortedMap<Integer, List<NTSampleBuilderType>> snareSamples,
+    final NTInstrumentBuilderType sfInstrument)
+  {
+    for (final var snareEntry : snareSamples.entrySet()) {
+      final var rootNote =
+        snareEntry.getKey().intValue();
+      final var samples =
+        snareEntry.getValue();
+
+      final var velocityRegionSize = 128 / samples.size();
+      var velocityLow = 0;
+      var velocityHigh = velocityLow + velocityRegionSize;
+
+      for (final var sample : samples) {
+        final var zone = sfInstrument.addZone();
+        zone.addKeyRangeGenerator(rootNote, rootNote);
+        zone.addGenerator(
+          NTGenerators.findForName("sampleModes").orElseThrow(),
+          NTGenericAmount.of(0));
+        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
+        zone.addSampleGenerator(sample);
+
+        velocityLow = velocityHigh + 1;
+        velocityHigh = Math.min(127, velocityHigh + velocityRegionSize);
+      }
+    }
+  }
+
+  /**
+   * Add all of the splash samples.
+   */
+
+  private static void addSplashSampleDefinitions(
+    final SortedMap<Integer, List<NTSampleBuilderType>> splashSamples,
+    final NTInstrumentBuilderType sfInstrument)
+  {
+    for (final var splashEntry : splashSamples.entrySet()) {
+      final var rootNote =
+        splashEntry.getKey().intValue();
+      final var samples =
+        splashEntry.getValue();
+
+      final var velocityRegionSize = 128 / samples.size();
+      var velocityLow = 0;
+      var velocityHigh = velocityLow + velocityRegionSize;
+
+      for (final var sample : samples) {
+        final var zone = sfInstrument.addZone();
+        zone.addKeyRangeGenerator(rootNote, rootNote);
+        zone.addGenerator(
+          NTGenerators.findForName("sampleModes").orElseThrow(),
+          NTGenericAmount.of(0));
+        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
+        zone.addSampleGenerator(sample);
+
+        velocityLow = velocityHigh + 1;
+        velocityHigh = Math.min(127, velocityHigh + velocityRegionSize);
+      }
+    }
+  }
+
+  private static List<NTSampleBuilderType> addSnareSpecific(
+    final NTBuilderType builder,
+    final int rootNote,
+    final DustYardSnareTautnessKind tautnessKind,
+    final DustYardSnareStrikeKind strikeKind,
+    final DustYardSnareStrikeFiles strikeFiles)
+    throws IOException
+  {
+    final var samples = new ArrayList<NTSampleBuilderType>();
+    for (final var entry : strikeFiles.filesByVelocity().entrySet()) {
+      final var velocity = entry.getKey();
+      final var file = entry.getValue();
+
+      final var sampleName =
+        String.format(
+          "%s_%s_%02d",
+          tautnessKind.shortName(),
+          strikeKind.shortName(),
+          velocity
+        );
+
+      final var sample =
+        builder.addSample(sampleName);
+
+      final SampleBufferType sampleBuffer;
+      try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        sampleBuffer = SampleBufferXMedia.sampleBufferOfStream(
+          stream, DustYardFont::buffers
+        );
+      } catch (final UnsupportedAudioFileException e) {
+        throw new IOException(e);
+      }
+
+      sample.setSampleRate((int) sampleBuffer.sampleRate());
+      sample.setPitchCorrection(0);
+      sample.setSampleCount(sampleBuffer.samples());
+      sample.setOriginalPitch(NTPitch.of(rootNote));
+      sample.setLoopStart(0L);
+      sample.setLoopEnd(sampleBuffer.samples() - 1L);
+      sample.setDataWriter(ch -> copySampleToChannel(
+        sampleBuffer,
+        sampleName,
+        ch));
+      samples.add(sample);
+    }
+    return List.copyOf(samples);
+  }
+
+  private static SampleBufferType buffers(
+    final int channels,
+    final long frames,
+    final double sampleRate)
+  {
+    return SampleBufferDouble.createWithHeapBuffer(
+      channels,
+      frames,
+      sampleRate
+    );
+  }
+
+  private static String textResource(
+    final String name)
+    throws IOException
+  {
+    final var path =
+      String.format("/com/io7m/music/kit/dust_yard/generator/%s", name);
+    try (var stream = DustYardFont.class.getResourceAsStream(path)) {
+      return new String(stream.readAllBytes(), US_ASCII);
+    }
+  }
+
+  private static void copySampleToChannel(
+    final SampleBufferType source,
+    final String sampleName,
+    final SeekableByteChannel channel)
+    throws IOException
+  {
+    LOG.debug("copying: {}", sampleName);
+
+    final var buffer =
+      ByteBuffer.allocate(Math.toIntExact(source.samples() * 2L))
+        .order(LITTLE_ENDIAN);
+
+    for (var index = 0L; index < source.frames(); ++index) {
+      final var frame_d = source.frameGetExact(index);
+      final var frame_s = frame_d * 32767.0;
+      final var frame_i = (short) frame_s;
+      buffer.putShort(frame_i);
+    }
+
+    buffer.flip();
+    final var wrote = channel.write(buffer);
+    if (wrote != buffer.capacity()) {
+      throw new IOException(
+        new StringBuilder(32)
+          .append("Wrote too few bytes (wrote ")
+          .append(wrote)
+          .append(" expected ")
+          .append(buffer.capacity())
+          .append(")")
+          .toString()
+      );
+    }
   }
 
   public void write(
@@ -94,7 +352,7 @@ public final class DustYardFont
         .setVersion(NTVersion.of(2, 11))
         .setProduct(NTShortString.of("com.io7m.music.kit.dust_yard"))
         .setEngineers(NTShortString.of("Mark Raynsford <audio@io7m.com>"))
-        .setCopyright(NTShortString.of("Public Domain"))
+        .setCopyright(NTShortString.of("(c) 2021 Mark Raynsford <audio@io7m.com>"))
         .setCreationDate(NTShortString.of(OffsetDateTime.now().toString()))
         .setComment(NTLongString.of(textResource("comment.txt")))
         .build()
@@ -102,6 +360,12 @@ public final class DustYardFont
 
     final var snareSamples =
       this.addSnare(builder);
+    final var bdSamples =
+      this.addBassDrum(builder);
+    final var cymSamples =
+      this.addChinaHiHat(builder);
+    final var splashSamples =
+      this.addSplash(builder);
 
     final var sfInstrument =
       builder.addInstrument("dustYard");
@@ -147,31 +411,148 @@ public final class DustYardFont
       NTTransforms.find(0)
     );
 
-    for (final var snareEntry : snareSamples.entrySet()) {
-      final var rootNote =
-        snareEntry.getKey().intValue();
-      final var samples =
-        snareEntry.getValue();
+    addSnareSampleDefinitions(snareSamples, sfInstrument);
+    addBassDrumSampleDefinitions(bdSamples, sfInstrument);
+    addChinaHiHatSampleDefinitions(cymSamples, sfInstrument);
+    addSplashSampleDefinitions(splashSamples, sfInstrument);
+    this.serialize(fileOutput, builder);
+  }
 
-      final var velocityRegionSize = 128 / samples.size();
-      var velocityLow = 0;
-      var velocityHigh = velocityLow + velocityRegionSize;
+  private SortedMap<Integer, List<NTSampleBuilderType>> addSplash(
+    final NTBuilderType builder)
+    throws IOException
+  {
+    final SortedMap<Integer, List<NTSampleBuilderType>> samples =
+      new TreeMap<>();
+    final var splashFiles =
+      this.splashConverted.files();
 
-      for (final var sample : samples) {
-        final var zone = sfInstrument.addZone();
-        zone.addKeyRangeGenerator(rootNote, rootNote);
-        zone.addGenerator(
-          NTGenerators.findForName("sampleModes").orElseThrow(),
-          NTGenericAmount.of(0));
-        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
-        zone.addSampleGenerator(sample);
+    var index = 0;
+    for (final var kind : splashFiles.keySet()) {
+      final var byVelocity = splashFiles.get(kind);
+      for (final var velocity : byVelocity.keySet()) {
+        final var file = byVelocity.get(velocity);
 
-        velocityLow = velocityHigh + 1;
-        velocityHigh = Math.min(127, velocityHigh + velocityRegionSize);
+        final var sampleName =
+          String.format("SP_%s_%02d", kind.toUpperCase(Locale.ROOT), velocity);
+        final var sample =
+          builder.addSample(sampleName);
+
+        final SampleBufferType sampleBuffer;
+        try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+          sampleBuffer =
+            SampleBufferXMedia.sampleBufferOfStream(
+              stream, DustYardFont::buffers);
+        } catch (final UnsupportedAudioFileException e) {
+          throw new IOException(e);
+        }
+
+        sample.setSampleRate((int) sampleBuffer.sampleRate());
+        sample.setPitchCorrection(0);
+        sample.setSampleCount(sampleBuffer.samples());
+        sample.setOriginalPitch(NTPitch.of(SPLASH_ROOT + index));
+        sample.setLoopStart(0L);
+        sample.setLoopEnd(sampleBuffer.samples() - 1L);
+        sample.setDataWriter(ch -> copySampleToChannel(
+          sampleBuffer,
+          sampleName,
+          ch));
+
+        final var velocities =
+          samples.computeIfAbsent(
+            Integer.valueOf(SPLASH_ROOT + index),
+            ignored -> new ArrayList<>()
+          );
+
+        velocities.add(sample);
       }
+      ++index;
     }
 
-    this.serialize(fileOutput, builder);
+    return samples;
+  }
+
+  private List<NTSampleBuilderType> addChinaHiHat(
+    final NTBuilderType builder)
+    throws IOException
+  {
+    final List<NTSampleBuilderType> samples = new ArrayList<>();
+    final var entries = this.cym.byKind().entrySet();
+
+    var index = 0;
+    for (final var entry : entries) {
+      final var file = entry.getValue();
+      final var kind = entry.getKey();
+
+      final var sampleName =
+        String.format("CHH_%s", kind.toUpperCase(Locale.ROOT));
+      final var sample =
+        builder.addSample(sampleName);
+
+      final SampleBufferType sampleBuffer;
+      try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        sampleBuffer =
+          SampleBufferXMedia.sampleBufferOfStream(
+            stream, DustYardFont::buffers);
+      } catch (final UnsupportedAudioFileException e) {
+        throw new IOException(e);
+      }
+
+      sample.setSampleRate((int) sampleBuffer.sampleRate());
+      sample.setPitchCorrection(0);
+      sample.setSampleCount(sampleBuffer.samples());
+      sample.setOriginalPitch(NTPitch.of(CYMBAL_ROOT + index));
+      sample.setLoopStart(0L);
+      sample.setLoopEnd(sampleBuffer.samples() - 1L);
+      sample.setDataWriter(ch -> copySampleToChannel(
+        sampleBuffer,
+        sampleName,
+        ch));
+      samples.add(sample);
+      ++index;
+    }
+
+    return List.copyOf(samples);
+  }
+
+  private List<NTSampleBuilderType> addBassDrum(
+    final NTBuilderType builder)
+    throws IOException
+  {
+    final List<NTSampleBuilderType> samples =
+      new ArrayList<>();
+
+    for (final var entry : this.bassDrum.byVelocity().entrySet()) {
+      final var velocity = entry.getKey();
+      final var file = entry.getValue();
+
+      final var sampleName =
+        String.format("BD_%02d", velocity);
+      final var sample =
+        builder.addSample(sampleName);
+
+      final SampleBufferType sampleBuffer;
+      try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
+        sampleBuffer =
+          SampleBufferXMedia.sampleBufferOfStream(
+            stream, DustYardFont::buffers);
+      } catch (final UnsupportedAudioFileException e) {
+        throw new IOException(e);
+      }
+
+      sample.setSampleRate((int) sampleBuffer.sampleRate());
+      sample.setPitchCorrection(0);
+      sample.setSampleCount(sampleBuffer.samples());
+      sample.setOriginalPitch(NTPitch.of(24));
+      sample.setLoopStart(0L);
+      sample.setLoopEnd(sampleBuffer.samples() - 1L);
+      sample.setDataWriter(ch -> copySampleToChannel(
+        sampleBuffer,
+        sampleName,
+        ch));
+      samples.add(sample);
+    }
+    return List.copyOf(samples);
   }
 
   private void serialize(
@@ -195,7 +576,7 @@ public final class DustYardFont
     throws IOException
   {
     final AtomicInteger rootNote =
-      new AtomicInteger(24);
+      new AtomicInteger(36);
     final SortedMap<Integer, List<NTSampleBuilderType>> samples =
       new TreeMap<>();
 
@@ -224,101 +605,5 @@ public final class DustYardFont
       throw e.getCause();
     }
     return samples;
-  }
-
-  private static List<NTSampleBuilderType> addSnareSpecific(
-    final NTBuilderType builder,
-    final int rootNote,
-    final DustYardSnareTautnessKind tautnessKind,
-    final DustYardSnareStrikeKind strikeKind,
-    final DustYardSnareStrikeFiles strikeFiles)
-    throws IOException
-  {
-    final var samples = new ArrayList<NTSampleBuilderType>();
-    for (final var entry : strikeFiles.filesByVelocity().entrySet()) {
-      final var velocity = entry.getKey();
-      final var file = entry.getValue();
-
-      final var sample =
-        builder.addSample(
-          String.format(
-            "%s_%s_%02d",
-            tautnessKind.shortName(),
-            strikeKind.shortName(),
-            velocity
-          ));
-
-      final SampleBufferType sampleBuffer;
-      try (var stream = AudioSystem.getAudioInputStream(file.toFile())) {
-        sampleBuffer = SampleBufferXMedia.sampleBufferOfStream(
-          stream, DustYardFont::buffers
-        );
-      } catch (final UnsupportedAudioFileException e) {
-        throw new IOException(e);
-      }
-
-      sample.setSampleRate((int) sampleBuffer.sampleRate());
-      sample.setPitchCorrection(0);
-      sample.setSampleCount(sampleBuffer.samples());
-      sample.setOriginalPitch(NTPitch.of(rootNote));
-      sample.setLoopStart(0L);
-      sample.setLoopEnd(sampleBuffer.samples() - 1L);
-      sample.setDataWriter(ch -> copySampleToChannel(sampleBuffer, ch));
-      samples.add(sample);
-    }
-    return List.copyOf(samples);
-  }
-
-  private static SampleBufferType buffers(
-    final int channels,
-    final long frames,
-    final double sampleRate)
-  {
-    return SampleBufferDouble.createWithHeapBuffer(
-      channels,
-      frames,
-      sampleRate);
-  }
-
-  private static String textResource(
-    final String name)
-    throws IOException
-  {
-    final var path =
-      String.format("/com/io7m/music/kit/dust_yard/generator/%s", name);
-    try (var stream = DustYardFont.class.getResourceAsStream(path)) {
-      return new String(stream.readAllBytes(), US_ASCII);
-    }
-  }
-
-  private static void copySampleToChannel(
-    final SampleBufferType source,
-    final SeekableByteChannel channel)
-    throws IOException
-  {
-    final var buffer =
-      ByteBuffer.allocate(Math.toIntExact(source.samples() * 2L))
-        .order(LITTLE_ENDIAN);
-
-    for (var index = 0L; index < source.frames(); ++index) {
-      final var frame_d = source.frameGetExact(index);
-      final var frame_s = frame_d * 32767.0;
-      final var frame_i = (short) frame_s;
-      buffer.putShort(frame_i);
-    }
-
-    buffer.flip();
-    final var wrote = channel.write(buffer);
-    if (wrote != buffer.capacity()) {
-      throw new IOException(
-        new StringBuilder(32)
-          .append("Wrote too few bytes (wrote ")
-          .append(wrote)
-          .append(" expected ")
-          .append(buffer.capacity())
-          .append(")")
-          .toString()
-      );
-    }
   }
 }

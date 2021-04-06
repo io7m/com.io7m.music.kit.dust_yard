@@ -66,16 +66,19 @@ public final class DustYard
     final var builders =
       ServiceLoader.load(NTBuilderProviderType.class)
         .findFirst()
-        .orElseThrow(() -> new IllegalStateException("No builder service available"));
+        .orElseThrow(() -> new IllegalStateException(
+          "No builder service available"));
 
     final var writers =
       ServiceLoader.load(NTWriterProviderType.class)
         .findFirst()
-        .orElseThrow(() -> new IllegalStateException("No writer service available"));
+        .orElseThrow(() -> new IllegalStateException(
+          "No writer service available"));
 
     final var snare =
       DustYardSnare.open(
-        this.sourceDirectory.resolve("8833__quartertone__snaredrum-14x08inchtama-veryhighpitch-multisampled")
+        this.sourceDirectory.resolve(
+          "8833__quartertone__snaredrum-14x08inchtama-veryhighpitch-multisampled")
       );
     final var snareConverted =
       DustYardSnareConversion.convertFLACs(
@@ -83,8 +86,48 @@ public final class DustYard
         this.temporaryDirectory.resolve("snare")
       );
 
+    final var bd =
+      DustYardBassDrum.open(
+        this.sourceDirectory.resolve(
+          "8586__quartertone__bassdrum-22x16-open-multisampled")
+      );
+    final var bdConverted =
+      DustYardBassDrumConversion.convertFLACs(
+        bd,
+        this.temporaryDirectory.resolve("bd")
+      );
+
+    final var cym =
+      DustYardChinaHiHat.open(
+        this.sourceDirectory.resolve(
+          "8656__quartertone__hihats-18x20inchchinahats-multisampled")
+      );
+    final var cymConverted =
+      DustYardChinaHiHatConversion.convertFLACs(
+        cym,
+        this.temporaryDirectory.resolve("cym")
+      );
+
+    final var splash =
+      DustYardSplash.open(
+        this.sourceDirectory.resolve(
+          "12776__quartertone__splashcymbal-08inzildjiana-efx-1")
+      );
+    final var splashConverted =
+      DustYardSplashConversion.convertFLACs(
+        splash,
+        this.temporaryDirectory.resolve("splash")
+      );
+
     final var dustYardFont =
-      DustYardFont.of(builders, writers, snareConverted);
+      DustYardFont.of(
+        builders,
+        writers,
+        snareConverted,
+        bdConverted,
+        cymConverted,
+        splashConverted
+      );
 
     dustYardFont.write(this.targetFile);
   }
