@@ -61,6 +61,7 @@
         <artifactId>exec-maven-plugin</artifactId>
         <executions>
           <execution>
+            <id>generate-soundfont</id>
             <phase>package</phase>
             <goals>
               <goal>java</goal>
@@ -72,6 +73,28 @@
                 <argument>${project.build.directory}/samples</argument>
                 <argument>${project.build.directory}/dust_yard-${project.version}.sf2</argument>
               </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>generate-soundfont</id>
+            <phase>package</phase>
+            <goals>
+              <goal>attach-artifact</goal>
+            </goals>
+            <configuration>
+              <artifacts>
+                <artifact>
+                  <file>${project.build.directory}/dust_yard-${project.version}.sf2</file>
+                  <type>sf2</type>
+                </artifact>
+              </artifacts>
             </configuration>
           </execution>
         </executions>
