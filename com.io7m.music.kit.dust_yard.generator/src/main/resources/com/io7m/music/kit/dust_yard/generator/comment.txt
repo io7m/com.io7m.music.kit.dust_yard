@@ -1,0 +1,24 @@
+Dust Yard ${project.version}
+
+There is no secret in the fact that when crushed stone is used, the volume of
+concrete produced generally is less than when gravel is employed as the coarse
+aggregate in concrete of identical proportions. The reason for this fact is that
+gravel generally has a smaller percentage of voids than crushed stone because it
+is rounded in shape and rounded particles of a given gradation have a smaller
+percentage of voids than angular particles of the same gradation. If the
+gradations differ to any appreciable extent, it may be that, in a few cases,
+the crushed stone will have a smaller percentage of voids than the gravel but
+this is not the rule. Since gravel concrete of given proportions occupies a
+greater volume than stone concrete of the same proportions, it follows that a
+somewhat lesser amount of cement is used per cubic yard in gravel concrete
+than in stone concrete. Conversely, stone concrete, as a general rule,
+requires more cement per cubic yard than gravel concrete when like volumetric
+proportions are used for both materials.
+
+All credit goes to Quartertone:
+
+  https://freesound.org/people/quartertone/
+
+License:
+
+  http://creativecommons.org/licenses/by/3.0/

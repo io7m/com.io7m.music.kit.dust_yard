@@ -1,0 +1,3 @@
+[submodule "com.io7m.music.quartertone.raw"]
+	path = com.io7m.music.quartertone.raw
+	url = https://github.com/io7m/com.io7m.music.quartertone.raw
