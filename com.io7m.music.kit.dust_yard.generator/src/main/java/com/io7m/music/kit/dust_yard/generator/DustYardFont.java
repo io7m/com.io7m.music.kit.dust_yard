@@ -45,7 +45,6 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SeekableByteChannel;
 import java.nio.file.Path;
-import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -131,11 +130,7 @@ public final class DustYardFont
     for (final var bdSample : bdSamples) {
       final var zone = sfInstrument.addZone();
       zone.addKeyRangeGenerator(24, 24);
-      zone.addGenerator(
-        NTGenerators.findForName("sampleModes").orElseThrow(),
-        NTGenericAmount.of(0));
       zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
-      zone.addSampleGenerator(bdSample);
       zone.addGenerator(
         NTGenerators.findForName("decayVolEnv").orElseThrow(),
         NTGenericAmount.of(702)
@@ -144,6 +139,10 @@ public final class DustYardFont
         NTGenerators.findForName("sustainVolEnv").orElseThrow(),
         NTGenericAmount.of(1440)
       );
+      zone.addGenerator(
+        NTGenerators.findForName("sampleModes").orElseThrow(),
+        NTGenericAmount.of(0));
+      zone.addSampleGenerator(bdSample);
 
       velocityLow = velocityHigh + 1;
       velocityHigh = Math.min(127, velocityHigh + velocityRegionSize);
@@ -191,10 +190,10 @@ public final class DustYardFont
       for (final var sample : samples) {
         final var zone = sfInstrument.addZone();
         zone.addKeyRangeGenerator(rootNote, rootNote);
+        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
         zone.addGenerator(
           NTGenerators.findForName("sampleModes").orElseThrow(),
           NTGenericAmount.of(0));
-        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
         zone.addSampleGenerator(sample);
 
         velocityLow = velocityHigh + 1;
@@ -224,10 +223,10 @@ public final class DustYardFont
       for (final var sample : samples) {
         final var zone = sfInstrument.addZone();
         zone.addKeyRangeGenerator(rootNote, rootNote);
+        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
         zone.addGenerator(
           NTGenerators.findForName("sampleModes").orElseThrow(),
           NTGenericAmount.of(0));
-        zone.addVelocityRangeGenerator(velocityLow, velocityHigh);
         zone.addSampleGenerator(sample);
 
         velocityLow = velocityHigh + 1;
@@ -352,7 +351,8 @@ public final class DustYardFont
         .setVersion(NTVersion.of(2, 11))
         .setProduct(NTShortString.of("com.io7m.music.kit.dust_yard"))
         .setEngineers(NTShortString.of("Mark Raynsford <audio@io7m.com>"))
-        .setCopyright(NTShortString.of("(c) 2021 Mark Raynsford <audio@io7m.com>"))
+        .setCopyright(NTShortString.of(
+          "(c) 2021 Mark Raynsford <audio@io7m.com>"))
         .setCreationDate(NTShortString.of("2021-04-06"))
         .setComment(NTLongString.of(textResource("comment.txt")))
         .build()
@@ -367,8 +367,27 @@ public final class DustYardFont
     final var splashSamples =
       this.addSplash(builder);
 
+    instrumentWithVelocity(
+      builder,
+      snareSamples,
+      bdSamples,
+      cymSamples,
+      splashSamples
+    );
+
+    this.serialize(fileOutput, builder);
+  }
+
+  private static void instrumentWithVelocity(
+    final NTBuilderType builder,
+    final SortedMap<Integer, List<NTSampleBuilderType>> snareSamples,
+    final List<NTSampleBuilderType> bdSamples,
+    final List<NTSampleBuilderType> cymSamples,
+    final SortedMap<Integer, List<NTSampleBuilderType>> splashSamples)
+  {
     final var sfInstrument =
-      builder.addInstrument("dustYard");
+      builder.addInstrument("dustYardNoVelocity");
+
     final var preset =
       builder.addPreset(
         NTBankIndex.of(128),
@@ -415,7 +434,6 @@ public final class DustYardFont
     addBassDrumSampleDefinitions(bdSamples, sfInstrument);
     addChinaHiHatSampleDefinitions(cymSamples, sfInstrument);
     addSplashSampleDefinitions(splashSamples, sfInstrument);
-    this.serialize(fileOutput, builder);
   }
 
   private SortedMap<Integer, List<NTSampleBuilderType>> addSplash(
