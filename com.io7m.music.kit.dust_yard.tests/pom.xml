@@ -9,7 +9,7 @@
   <parent>
     <artifactId>com.io7m.music.kit.dust_yard</artifactId>
     <groupId>com.io7m.music.kit.dust_yard</groupId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
   </parent>
   <artifactId>com.io7m.music.kit.dust_yard.tests</artifactId>
 

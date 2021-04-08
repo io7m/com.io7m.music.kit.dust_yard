@@ -14,7 +14,7 @@
 
   <groupId>com.io7m.music.kit.dust_yard</groupId>
   <artifactId>com.io7m.music.kit.dust_yard</artifactId>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>1.0.0</version>
 
   <packaging>pom</packaging>
   <name>com.io7m.music.kit.dust_yard</name>
