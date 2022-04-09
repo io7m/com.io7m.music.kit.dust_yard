@@ -30,7 +30,7 @@
   <properties>
     <com.io7m.jbssio.version>1.0.2</com.io7m.jbssio.version>
     <com.io7m.jnoisetype.version>0.0.4</com.io7m.jnoisetype.version>
-    <com.io7m.jsamplebuffer.version>0.0.1</com.io7m.jsamplebuffer.version>
+    <com.io7m.jsamplebuffer.version>0.0.2</com.io7m.jsamplebuffer.version>
     <com.io7m.jspiel.version>0.0.4</com.io7m.jspiel.version>
     <io7m.api.previousVersion>0.0.1-SNAPSHOT</io7m.api.previousVersion>
     <org.immutables.version>2.8.8</org.immutables.version>
